@@ -1,0 +1,202 @@
+-- =========================
+-- EVENT MANAGEMENT SYSTEM DATABASE
+-- Student Work
+-- =========================
+
+-- 1. CREATE SCHEMA
+CREATE SCHEMA IF NOT EXISTS ems_schema;
+SET search_path TO ems_schema;
+
+-- =========================
+-- 2. CREATE TABLES
+-- =========================
+
+CREATE TABLE venues (
+venue_id SERIAL PRIMARY KEY,
+venue_name VARCHAR(100),
+city VARCHAR(100),
+address_line VARCHAR(200),
+capacity INT
+);
+
+CREATE TABLE organizers (
+organizer_id SERIAL PRIMARY KEY,
+organizer_name VARCHAR(100),
+email VARCHAR(100),
+phone VARCHAR(20)
+);
+
+CREATE TABLE participants (
+participant_id SERIAL PRIMARY KEY,
+first_name VARCHAR(50),
+last_name VARCHAR(50),
+gender CHAR(1),
+email VARCHAR(100),
+phone VARCHAR(20)
+);
+
+CREATE TABLE sponsors (
+sponsor_id SERIAL PRIMARY KEY,
+company_name VARCHAR(100),
+contact_email VARCHAR(100)
+);
+
+CREATE TABLE speakers (
+speaker_id SERIAL PRIMARY KEY,
+speaker_name VARCHAR(100),
+email VARCHAR(100)
+);
+
+CREATE TABLE events (
+event_id SERIAL PRIMARY KEY,
+event_name VARCHAR(150),
+description TEXT,
+start_date DATE,
+end_date DATE,
+venue_id INT REFERENCES venues(venue_id),
+organizer_id INT REFERENCES organizers(organizer_id),
+status VARCHAR(20)
+);
+
+CREATE TABLE sessions (
+session_id SERIAL PRIMARY KEY,
+event_id INT REFERENCES events(event_id),
+title VARCHAR(150),
+start_time TIMESTAMP,
+end_time TIMESTAMP
+);
+
+CREATE TABLE logistics (
+logistics_id SERIAL PRIMARY KEY,
+event_id INT REFERENCES events(event_id),
+item_name VARCHAR(100),
+quantity INT
+);
+
+CREATE TABLE registrations (
+registration_id SERIAL PRIMARY KEY,
+participant_id INT REFERENCES participants(participant_id),
+event_id INT REFERENCES events(event_id),
+registration_date TIMESTAMP,
+status VARCHAR(20)
+);
+
+CREATE TABLE session_speakers (
+session_id INT REFERENCES sessions(session_id),
+speaker_id INT REFERENCES speakers(speaker_id),
+PRIMARY KEY (session_id, speaker_id)
+);
+
+CREATE TABLE event_sponsors (
+event_id INT REFERENCES events(event_id),
+sponsor_id INT REFERENCES sponsors(sponsor_id),
+sponsorship_level VARCHAR(20),
+PRIMARY KEY (event_id, sponsor_id)
+);
+
+-- =========================
+-- 3. ROLES AND USERS
+-- =========================
+
+DO $$
+BEGIN
+IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ems_admin_role') THEN
+CREATE ROLE ems_admin_role;
+END IF;
+
+```
+IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ems_readonly_role') THEN
+    CREATE ROLE ems_readonly_role;
+END IF;
+
+IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ems_admin_user') THEN
+    CREATE ROLE ems_admin_user LOGIN PASSWORD 'admin123';
+END IF;
+
+IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ems_reader_user') THEN
+    CREATE ROLE ems_reader_user LOGIN PASSWORD 'reader123';
+END IF;
+```
+
+END $$;
+
+GRANT ems_admin_role TO ems_admin_user;
+GRANT ems_readonly_role TO ems_reader_user;
+
+GRANT USAGE ON SCHEMA ems_schema TO ems_admin_role;
+GRANT USAGE ON SCHEMA ems_schema TO ems_readonly_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ems_schema TO ems_admin_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA ems_schema TO ems_readonly_role;
+
+-- =========================
+-- 4. INSERT DATA
+-- =========================
+
+INSERT INTO venues (venue_name, city, address_line, capacity) VALUES
+('Atyrau Hall', 'Atyrau', 'Satpayev 15', 500),
+('Expo Center', 'Astana', 'Turan 20', 800);
+
+INSERT INTO organizers (organizer_name, email, phone) VALUES
+('Global Events', '[global@mail.com](mailto:global@mail.com)', '+77011111111');
+
+INSERT INTO participants (first_name, last_name, gender, email, phone) VALUES
+('Ali', 'Nurgaliyev', 'M', '[ali@mail.com](mailto:ali@mail.com)', '+77023334455'),
+('Dana', 'Sarsenova', 'F', '[dana@mail.com](mailto:dana@mail.com)', '+77024445566');
+
+INSERT INTO sponsors (company_name, contact_email) VALUES
+('Kaspi Tech', '[kaspi@mail.com](mailto:kaspi@mail.com)');
+
+INSERT INTO speakers (speaker_name, email) VALUES
+('Aruzhan Bekova', '[speaker@mail.com](mailto:speaker@mail.com)');
+
+INSERT INTO events (event_name, description, start_date, end_date, venue_id, organizer_id, status) VALUES
+(
+'Tech Expo',
+'IT event',
+'2026-05-10',
+'2026-05-12',
+(SELECT venue_id FROM venues WHERE venue_name = 'Atyrau Hall'),
+(SELECT organizer_id FROM organizers WHERE organizer_name = 'Global Events'),
+'planned'
+);
+
+INSERT INTO sessions (event_id, title, start_time, end_time) VALUES
+((SELECT event_id FROM events WHERE event_name = 'Tech Expo'),
+'AI Basics',
+'2026-05-10 10:00:00',
+'2026-05-10 11:00:00');
+
+INSERT INTO logistics (event_id, item_name, quantity) VALUES
+((SELECT event_id FROM events WHERE event_name = 'Tech Expo'), 'Projector', 2);
+
+INSERT INTO registrations (participant_id, event_id, registration_date, status) VALUES
+((SELECT participant_id FROM participants WHERE email='[ali@mail.com](mailto:ali@mail.com)'),
+(SELECT event_id FROM events WHERE event_name='Tech Expo'),
+'2026-04-01', 'confirmed');
+
+-- =========================
+-- 5. UPDATE
+-- =========================
+
+UPDATE events
+SET status = 'completed'
+WHERE event_name = 'Tech Expo';
+
+-- =========================
+-- 6. TRANSACTION
+-- =========================
+
+BEGIN;
+
+DELETE FROM registrations WHERE status = 'cancelled';
+
+ROLLBACK;
+
+-- =========================
+-- 7. SELECT
+-- =========================
+
+SELECT * FROM events;
+SELECT * FROM participants;
+SELECT COUNT(*) FROM registrations;
